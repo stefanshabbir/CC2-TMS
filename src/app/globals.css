@@ -1,29 +1,118 @@
-:root {
-  --background: #0f172a;
-  --foreground: #f8fafc;
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --accent: #10b981;
-  --card-bg: rgba(30, 41, 59, 0.7);
-  --border: rgba(255, 255, 255, 0.1);
-  --font-sans: var(--font-inter), sans-serif;
+@import 'tailwindcss';
+
+@theme {
+  /* === Orange Cream Soda Palette === */
+  --color-bg-deep: #110e0c;
+  --color-bg-base: #1a1410;
+  --color-bg-surface: #261e17;
+  --color-bg-card: #2f2519;
+  --color-bg-elevated: #3a2e20;
+
+  --color-cream-50: #fefcf7;
+  --color-cream-100: #faf3e8;
+  --color-cream-200: #f5e6d0;
+  --color-cream-300: #ebd4b0;
+  --color-cream-400: #d4a574;
+
+  --color-orange-400: #f7a34e;
+  --color-orange-500: #f7944e;
+  --color-orange-600: #e8621c;
+  --color-orange-700: #c44d12;
+
+  --color-muted: #8b7355;
+  --color-border: #3d3228;
+  --color-border-light: #4d4035;
+
+  /* Focus ring */
+  --color-focus: #f7944e;
+
+  /* Status colors */
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+
+  /* Custom animations */
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.4s ease-out;
+  --animate-pulse-soft: pulse-soft 3s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
 }
 
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  font-family: var(--font-sans);
-  background-color: var(--background);
-  color: var(--foreground);
+/* === Base Styles === */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg-deep);
+  color: var(--color-cream-100);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  box-sizing: border-box;
+/* === Accessibility: Focus Visible === */
+*:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-a {
-  color: inherit;
+/* === Accessible Skip Link === */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 9999;
+  padding: 0.75rem 1.5rem;
+  background: var(--color-orange-500);
+  color: var(--color-bg-deep);
+  font-weight: 700;
   text-decoration: none;
+  border-radius: 0 0 8px 0;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+}
+
+/* === Form Base Styles === */
+input, select, textarea {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
