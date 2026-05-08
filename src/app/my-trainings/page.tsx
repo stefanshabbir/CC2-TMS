@@ -7,6 +7,7 @@ import { getUserEnrollments, getTrainerPrograms } from '@/lib/data';
 import type { Program } from '@/lib/types';
 
 function StatusBadge({ status }: { status: Program['status'] }) {
+  const s = status || 'upcoming';
   const styles: Record<Program['status'], string> = {
     upcoming:
       'bg-[var(--color-orange-500)]/15 text-[var(--color-orange-400)] border-[var(--color-orange-500)]/30',
@@ -24,9 +25,9 @@ function StatusBadge({ status }: { status: Program['status'] }) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${styles[status]}`}
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${styles[s]}`}
     >
-      {labels[status]}
+      {labels[s]}
     </span>
   );
 }

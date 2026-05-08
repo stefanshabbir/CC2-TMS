@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getProgramById, isUserEnrolled } from '@/lib/data';
+import { getProgramById, isUserEnrolled, getProgramResources, submitRating, getProgramRatings } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import EnrollButton from '@/components/EnrollButton';
-import type { Program } from '@/lib/types';
+import type { Program, Resource, Rating } from '@/lib/types';
 
 export default function ProgramDetailPage() {
   const params = useParams();
@@ -15,17 +15,30 @@ export default function ProgramDetailPage() {
 
   const [program, setProgram] = useState<Program | null | undefined>(undefined);
   const [enrolled, setEnrolled] = useState(false);
+  const [hasResources, setHasResources] = useState(false);
+  const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const p = await getProgramById(id);
-      setProgram(p || null);
-      if (p && user) {
-        const isEnrolled = await isUserEnrolled(user.id, id);
-        setEnrolled(isEnrolled);
+      try {
+        const p = await getProgramById(id);
+        setProgram(p || null);
+        if (p) {
+          const [isEnrolled, res, rates] = await Promise.all([
+            user ? isUserEnrolled(user.id, id) : Promise.resolve(false),
+            getProgramResources(id),
+            getProgramRatings(id)
+          ]);
+          setEnrolled(isEnrolled);
+          setHasResources(res.length > 0);
+          setRatings(rates);
+        }
+      } catch (err) {
+        console.error('Error loading program details:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     load();
   }, [id, user]);
@@ -153,18 +166,18 @@ export default function ProgramDetailPage() {
               </div>
               <p className="text-[var(--color-cream-100)]">
                 {new Date(program.start_date).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'long',
+                  weekday: 'short',
+                  month: 'short',
                   day: 'numeric',
-                  year: 'numeric',
-                })}{' '}
-                –{' '}
-                {new Date(program.end_date).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
                 })}
+                {' '}({new Date(program.start_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })})
+                {' – '}
+                {new Date(program.end_date).toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+                {' '}({new Date(program.end_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })})
               </p>
             </div>
 
@@ -261,6 +274,7 @@ export default function ProgramDetailPage() {
               programTitle={program.title}
               isFull={isFull}
               isAlreadyEnrolled={enrolled}
+              isCompleted={program.status === 'completed'}
             />
 
             {/* Quick info */}
@@ -272,12 +286,14 @@ export default function ProgramDetailPage() {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--color-muted)]">Duration</span>
                 <span className="text-[var(--color-cream-200)]">
-                  {Math.ceil(
-                    (new Date(program.end_date).getTime() -
-                      new Date(program.start_date).getTime()) /
-                      (1000 * 60 * 60 * 24)
-                  ) + 1}{' '}
-                  days
+                  {(() => {
+                    const diffMs = new Date(program.end_date).getTime() - new Date(program.start_date).getTime();
+                    const diffHours = diffMs / (1000 * 60 * 60);
+                    if (diffHours < 24) {
+                      return `${Math.round(diffHours * 10) / 10} hours`;
+                    }
+                    return `${Math.ceil(diffHours / 24)} days`;
+                  })()}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
@@ -287,17 +303,130 @@ export default function ProgramDetailPage() {
             </div>
 
             {/* Resources Link */}
-            <div className="mt-4 border-t border-[var(--color-border)] pt-4">
-              <Link
-                href={`/programs/${program.id}/resources`}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-border-light)] px-4 py-2.5 text-sm font-medium text-[var(--color-cream-300)] transition-colors hover:border-[var(--color-orange-500)] hover:text-[var(--color-orange-400)]"
-              >
-                📂 View Resources
-              </Link>
-            </div>
+            {(hasResources || user?.role === 'trainer' || user?.role === 'admin' || user?.role_id === 2 || user?.role_id === 1) && (
+              <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+                <Link
+                  href={`/programs/${program.id}/resources`}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-border-light)] px-4 py-2.5 text-sm font-medium text-[var(--color-cream-300)] transition-colors hover:border-[var(--color-orange-500)] hover:text-[var(--color-orange-400)]"
+                >
+                  📂 View Resources
+                </Link>
+              </div>
+            )}
           </div>
         </aside>
+      </div>
+
+      {/* Ratings Section */}
+      <div className="mt-12 space-y-8">
+        {program.status === 'completed' && (enrolled || user?.id === program.trainer_id) && (
+          <RatingForm 
+            programId={program.id} 
+            userId={user?.id || ''} 
+            role={user?.id === program.trainer_id ? 'trainer' : 'trainee'}
+            onSubmitted={async () => {
+              const rates = await getProgramRatings(program.id);
+              setRatings(rates);
+            }} 
+          />
+        )}
+
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-[var(--color-cream-50)]">Participant Feedback</h2>
+          {ratings.length > 0 ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {ratings.map(r => (
+                <div key={r.id} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="font-semibold text-[var(--color-cream-100)]">{r.user_name}</span>
+                    <div className="flex items-center gap-1 text-[var(--color-orange-400)]">
+                      {[...Array(5)].map((_, i) => (
+                        <svg key={i} className={`h-4 w-4 ${i < r.rating ? 'fill-current' : 'text-[var(--color-muted)]'}`} viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm italic text-[var(--color-cream-300)]">&quot;{r.comments || 'No written feedback provided.'}&quot;</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[var(--color-border)] p-12 text-center text-[var(--color-muted)]">
+              No ratings yet. Be the first to share your experience!
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
+function RatingForm({ programId, userId, role, onSubmitted }: { programId: string, userId: string, role: 'trainer' | 'trainee', onSubmitted: () => void }) {
+  const [rating, setRating] = useState(5);
+  const [comments, setComments] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const success = await submitRating({ 
+      program_id: programId, 
+      user_id: userId, 
+      rating, 
+      comments,
+      feedback_type: role === 'trainer' ? 'trainer_to_session' : 'trainee_to_program'
+    });
+    if (success) {
+      setDone(true);
+      onSubmitted();
+    }
+    setLoading(false);
+  };
+
+  if (done) return null;
+
+  return (
+    <div className="rounded-3xl border border-[var(--color-orange-500)]/30 bg-[var(--color-orange-500)]/5 p-8 shadow-2xl shadow-[var(--color-orange-500)]/5">
+      <h3 className="mb-6 text-xl font-bold text-[var(--color-cream-50)]">Rate your experience</h3>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-medium text-[var(--color-cream-200)]">Your Rating:</label>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setRating(star)}
+                className={`transition-transform hover:scale-110 ${star <= rating ? 'text-[var(--color-orange-500)]' : 'text-[var(--color-muted)]'}`}
+              >
+                <svg className="h-8 w-8 fill-current" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-[var(--color-cream-200)]">Feedback (Optional)</label>
+          <textarea
+            value={comments}
+            onChange={(e) => setComments(e.target.value)}
+            className="block w-full rounded-xl border border-[var(--color-border-light)] bg-[var(--color-bg-surface)] p-4 text-[var(--color-cream-100)] placeholder-[var(--color-muted)] focus:border-[var(--color-orange-500)] focus:ring-1 focus:ring-[var(--color-orange-500)]"
+            placeholder="What did you learn? How was the trainer?..."
+            rows={3}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-xl bg-[var(--color-orange-500)] py-3 font-bold text-white transition-all hover:bg-[var(--color-orange-600)] hover:shadow-lg disabled:opacity-50"
+        >
+          {loading ? 'Submitting...' : 'Submit Feedback'}
+        </button>
+      </form>
+    </div>
+  );
+}
+

@@ -16,7 +16,7 @@ interface ProgramFormProps {
 export default function ProgramForm({ initialData, isEdit }: ProgramFormProps) {
   const router = useRouter();
   const { user } = useAuth();
-  
+
   const [trainers, setTrainers] = useState<Profile[]>([]);
 
   const [title, setTitle] = useState(initialData?.title ?? '');
@@ -24,14 +24,24 @@ export default function ProgramForm({ initialData, isEdit }: ProgramFormProps) {
   const [description, setDescription] = useState(initialData?.description ?? '');
   const [category, setCategory] = useState(initialData?.category ?? '');
   const [trainerId, setTrainerId] = useState(initialData?.trainer_id ?? '');
-  // Format dates for input type="date"
-  const [startDate, setStartDate] = useState(initialData?.start_date ? new Date(initialData.start_date).toISOString().split('T')[0] : '');
-  const [endDate, setEndDate] = useState(initialData?.end_date ? new Date(initialData.end_date).toISOString().split('T')[0] : '');
+  // Format dates for input type="datetime-local" (YYYY-MM-DDTHH:mm)
+  const formatToDateTimeLocal = (isoString?: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const offset = date.getTimezoneOffset() * 60000;
+    const localISOTime = new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    return localISOTime;
+  };
+
+  const [startDate, setStartDate] = useState(initialData?.start_date ? formatToDateTimeLocal(initialData.start_date) : '');
+  const [endDate, setEndDate] = useState(initialData?.end_date ? formatToDateTimeLocal(initialData.end_date) : '');
   const [venue, setVenue] = useState(initialData?.venue ?? '');
   const [capacity, setCapacity] = useState(initialData?.capacity?.toString() ?? '');
-  const [status, setStatus] = useState<Program['status']>(initialData?.status ?? 'upcoming');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Get current date/time for "min" attribute restriction
+  const minDateTime = formatToDateTimeLocal(new Date().toISOString());
 
   useEffect(() => {
     async function loadTrainers() {
@@ -60,7 +70,7 @@ export default function ProgramForm({ initialData, isEdit }: ProgramFormProps) {
       return;
     }
     setSaving(true);
-    
+
     const supabase = createClient();
     const payload = {
       title,
@@ -71,7 +81,6 @@ export default function ProgramForm({ initialData, isEdit }: ProgramFormProps) {
       start_date: new Date(startDate).toISOString(),
       end_date: new Date(endDate).toISOString(),
       capacity: parseInt(capacity, 10),
-      status,
       trainer_id: trainerId,
       created_by: user.id
     };
@@ -137,21 +146,13 @@ export default function ProgramForm({ initialData, isEdit }: ProgramFormProps) {
           <textarea id="pf-desc" rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Detailed program description…" className={`${inputCls} resize-none`} />
         </div>
 
-        {/* Category + Status */}
+        {/* Category */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="pf-cat" className={labelCls}>Training Area / Category *</label>
             <select id="pf-cat" required value={category} onChange={e => setCategory(e.target.value)} className={inputCls}>
               <option value="">Select category…</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="pf-status" className={labelCls}>Status</label>
-            <select id="pf-status" value={status} onChange={e => setStatus(e.target.value as Program['status'])} className={inputCls}>
-              <option value="upcoming">Upcoming</option>
-              <option value="in-progress">In Progress</option>
-              <option value="completed">Completed</option>
             </select>
           </div>
         </div>
@@ -174,12 +175,12 @@ export default function ProgramForm({ initialData, isEdit }: ProgramFormProps) {
         {/* Dates */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="pf-start" className={labelCls}>Start Date *</label>
-            <input id="pf-start" type="date" required value={startDate} onChange={e => setStartDate(e.target.value)} className={inputCls} />
+            <label htmlFor="pf-start" className={labelCls}>Start Date & Time *</label>
+            <input id="pf-start" type="datetime-local" required min={minDateTime} value={startDate} onChange={e => setStartDate(e.target.value)} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="pf-end" className={labelCls}>End Date *</label>
-            <input id="pf-end" type="date" required value={endDate} onChange={e => setEndDate(e.target.value)} className={inputCls} />
+            <label htmlFor="pf-end" className={labelCls}>End Date & Time *</label>
+            <input id="pf-end" type="datetime-local" required min={startDate || minDateTime} value={endDate} onChange={e => setEndDate(e.target.value)} className={inputCls} />
           </div>
         </div>
 

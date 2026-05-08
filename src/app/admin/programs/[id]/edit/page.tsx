@@ -16,9 +16,14 @@ export default function EditProgramPage() {
 
   useEffect(() => {
     async function load() {
-      const p = await getProgramById(id);
-      setProgram(p || null);
-      setLoading(false);
+      try {
+        const p = await getProgramById(id);
+        setProgram(p || null);
+      } catch (err) {
+        console.error('Error loading program:', err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [id]);

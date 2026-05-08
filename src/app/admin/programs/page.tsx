@@ -59,12 +59,13 @@ export default function ManageProgramsPage() {
   };
 
   const statusBadge = (status: Program['status']) => {
-    const cls = status === 'upcoming'
+    const s = status || 'upcoming';
+    const cls = s === 'upcoming'
       ? 'border-[var(--color-orange-500)]/30 bg-[var(--color-orange-500)]/15 text-[var(--color-orange-400)]'
-      : status === 'in-progress'
+      : s === 'in-progress'
       ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/15 text-[var(--color-success)]'
       : 'border-[var(--color-muted)]/30 bg-[var(--color-muted)]/15 text-[var(--color-muted)]';
-    const label = status === 'in-progress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1);
+    const label = s === 'in-progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1);
     return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
   };
 

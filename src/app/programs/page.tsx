@@ -2,11 +2,13 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { getPrograms } from '@/lib/data';
+import { getPrograms, getUserEnrollments } from '@/lib/data';
+import { useAuth } from '@/lib/auth';
 import ProgramSearch from '@/components/ProgramSearch';
 import type { Program } from '@/lib/types';
 
 function StatusBadge({ status }: { status: Program['status'] }) {
+  const s = status || 'upcoming';
   const styles: Record<Program['status'], string> = {
     upcoming:
       'bg-[var(--color-orange-500)]/15 text-[var(--color-orange-400)] border-[var(--color-orange-500)]/30',
@@ -24,9 +26,9 @@ function StatusBadge({ status }: { status: Program['status'] }) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${styles[status]}`}
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${styles[s]}`}
     >
-      {labels[status]}
+      {labels[s]}
     </span>
   );
 }
@@ -63,21 +65,37 @@ function CapacityBar({ enrolled, capacity }: { enrolled: number; capacity: numbe
 }
 
 export default function ProgramsPage() {
+  const { user } = useAuth();
   const [allPrograms, setAllPrograms] = useState<Program[]>([]);
+  const [userEnrolledIds, setUserEnrolledIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getPrograms().then(data => {
-      setAllPrograms(data);
-      setLoading(false);
-    });
-  }, []);
+    async function load() {
+      try {
+        const [programsData, enrollmentsData] = await Promise.all([
+          getPrograms(),
+          user ? getUserEnrollments(user.id) : Promise.resolve([])
+        ]);
+        setAllPrograms(programsData);
+        setUserEnrolledIds(new Set(enrollmentsData.map(e => e.program_id)));
+      } catch (err) {
+        console.error('Error loading catalog:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [user]);
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return allPrograms;
+    // 1. Hide completed programs from catalog
+    const activePrograms = allPrograms.filter(p => p.status !== 'completed');
+
+    if (!searchQuery.trim()) return activePrograms;
     const q = searchQuery.toLowerCase();
-    return allPrograms.filter(
+    return activePrograms.filter(
       (p) =>
         p.title.toLowerCase().includes(q) ||
         (p.category || '').toLowerCase().includes(q) ||
@@ -125,9 +143,16 @@ export default function ProgramsPage() {
             >
               {/* Category + Status */}
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wider text-[var(--color-cream-400)]">
-                  {program.category}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium uppercase tracking-wider text-[var(--color-cream-400)]">
+                    {program.category}
+                  </span>
+                  {userEnrolledIds.has(program.id) && (
+                    <span className="rounded-full bg-[var(--color-success)]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-success)] border border-[var(--color-success)]/30">
+                      Enrolled
+                    </span>
+                  )}
+                </div>
                 <StatusBadge status={program.status} />
               </div>
 
@@ -164,12 +189,7 @@ export default function ProgramsPage() {
                       month: 'short',
                       day: 'numeric',
                     })}{' '}
-                    –{' '}
-                    {new Date(program.end_date).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
+                    at {new Date(program.start_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">

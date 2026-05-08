@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { enrollUser } from '@/lib/data';
 
 interface EnrollButtonProps {
   programId: string;
   programTitle: string;
   isFull: boolean;
   isAlreadyEnrolled: boolean;
+  isCompleted?: boolean;
 }
 
 export default function EnrollButton({
@@ -15,6 +17,7 @@ export default function EnrollButton({
   programTitle,
   isFull,
   isAlreadyEnrolled,
+  isCompleted = false,
 }: EnrollButtonProps) {
   const { user } = useAuth();
   const [enrolled, setEnrolled] = useState(isAlreadyEnrolled);
@@ -38,18 +41,19 @@ export default function EnrollButton({
   }
 
   const handleEnroll = async () => {
+    if (!user) return;
     setIsSubmitting(true);
     setFeedback(null);
 
-    // TODO: Replace with Supabase insert into enrollments
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const success = await enrollUser(user.id, programId);
 
-    setEnrolled(true);
+    if (success) {
+      setEnrolled(true);
+      setFeedback(`Successfully enrolled in "${programTitle}"!`);
+    } else {
+      setFeedback('Failed to enroll. Please try again later.');
+    }
     setIsSubmitting(false);
-    setFeedback(`Successfully enrolled in "${programTitle}"!`);
-
-    // Suppress unused variable warning in mock
-    void programId;
   };
 
   if (enrolled) {
@@ -84,9 +88,9 @@ export default function EnrollButton({
     <div>
       <button
         onClick={handleEnroll}
-        disabled={isFull || isSubmitting}
+        disabled={isFull || isSubmitting || isCompleted}
         className="w-full rounded-xl bg-[var(--color-orange-500)] px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-[var(--color-orange-500)]/25 transition-all hover:bg-[var(--color-orange-600)] hover:shadow-[var(--color-orange-600)]/30 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg-deep)] disabled:cursor-not-allowed disabled:opacity-50"
-        aria-label={isFull ? 'This program is full' : `Enroll in ${programTitle}`}
+        aria-label={isCompleted ? 'This program has ended' : isFull ? 'This program is full' : `Enroll in ${programTitle}`}
       >
         {isSubmitting ? (
           <span className="flex items-center justify-center gap-2">
@@ -112,13 +116,20 @@ export default function EnrollButton({
             </svg>
             Enrolling…
           </span>
+        ) : isCompleted ? (
+          'Session Ended'
         ) : isFull ? (
           'Program Full'
         ) : (
           'Enroll Now'
         )}
       </button>
-      {isFull && (
+      {isCompleted && (
+        <p className="mt-2 text-center text-sm text-[var(--color-muted)]">
+          Enrollment is closed for this session.
+        </p>
+      )}
+      {!isCompleted && isFull && (
         <p className="mt-2 text-center text-sm text-[var(--color-muted)]">
           This program has reached maximum capacity.
         </p>

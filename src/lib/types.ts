@@ -45,11 +45,21 @@ export interface Resource {
   program_id: string;
   file_name: string; // UI 'title'
   title?: string;    // UI convenience
-  description: string;
+  description?: string;
   file_type: 'pdf' | 'slides' | 'video' | 'document' | 'other';
-  file_size: string;
   file_url: string;
-  uploaded_by: string;
+  uid: string;
   uploaded_by_name?: string; // Fetched via join
   uploaded_at: string;
+}
+
+export interface Rating {
+  id: string;
+  program_id: string;
+  user_id: string;
+  user_name?: string;
+  rating: number;
+  comments?: string;
+  feedback_type: 'trainee_to_program' | 'trainer_to_session';
+  submitted_at: string;
 }
