@@ -74,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null);
       }
+      setIsLoading(false);
     });
 
     return () => {
@@ -111,27 +112,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const roleId = role === 'trainer' ? 2 : 3;
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name,
-          role_id: roleId,
+    try {
+      console.log('Starting registration for:', email);
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+            role_id: roleId,
+          }
         }
+      });
+
+      if (signUpError) {
+        console.error('Registration signUp error:', signUpError.message);
+        setError(signUpError.message);
+        return false;
       }
-    });
 
-    if (error) {
-      setError(error.message);
-      setIsLoading(false);
+      console.log('Sign up successful, user ID:', signUpData.user?.id);
+
+      // Immediately sign out so they have to log in manually
+      console.log('Signing out after registration...');
+      await supabase.auth.signOut();
+      
+      console.log('Registration flow complete.');
+      return true;
+    } catch (err: any) {
+      console.error('Unexpected registration error:', err);
+      setError(err.message || 'An unexpected error occurred.');
       return false;
+    } finally {
+      setIsLoading(false);
     }
-
-    // Immediately sign out so they have to log in manually
-    await supabase.auth.signOut();
-    setIsLoading(false);
-    return true;
   }, [supabase]);
 
   const logout = useCallback(async () => {

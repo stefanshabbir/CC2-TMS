@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<'trainee' | 'trainer'>('trainee');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -36,9 +37,13 @@ export default function RegisterPage() {
       return;
     }
 
+    setIsSubmitting(true);
     const success = await register(name, email, password, role);
     if (success) {
-      router.push('/?registered=true');
+      console.log('Registration success! Redirecting to login...');
+      router.replace('/?registered=true');
+    } else {
+      setIsSubmitting(false);
     }
   };
 
@@ -201,10 +206,10 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isSubmitting}
               className="w-full rounded-lg bg-[var(--color-orange-500)] px-4 py-3 text-base font-semibold text-white shadow-lg shadow-[var(--color-orange-500)]/25 transition-all hover:bg-[var(--color-orange-600)] hover:shadow-[var(--color-orange-600)]/30 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg-deep)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isLoading ? 'Creating account…' : 'Create Account'}
+              {isSubmitting ? 'Creating account…' : 'Create Account'}
             </button>
           </form>
         </div>
